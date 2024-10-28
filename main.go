@@ -1,13 +1,37 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
+	"time"
+
+	"github.com/SumDeusVitae/chirpy/internal/database"
+	"github.com/google/uuid"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	db             *database.Queries
+	platform       string
+}
+type User struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
+}
+
+type Chirp struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Body      string    `json:"body"`
+	User_id   uuid.UUID `json:"user_id"`
 }
 
 func addCacheControl(next http.Handler) http.Handler {
@@ -25,21 +49,38 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 }
 
 func main() {
+	godotenv.Load()
+	dbURL := os.Getenv("DB_URL")
+	plt := os.Getenv("PLATFORM")
+
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatal("Couldn't retrieve db")
+	}
+	dbQueries := database.New(db)
+
 	mux := http.NewServeMux()
 
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: mux,
 	}
-	cfg := &apiConfig{}
+	cfg := &apiConfig{
+		db:       dbQueries,
+		platform: plt,
+	}
 	cfg.fileserverHits.Store(0)
 	fileServer := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
 
 	mux.Handle("/app/", addCacheControl(cfg.middlewareMetricsInc(fileServer)))
 
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
-	mux.HandleFunc("POST /admin/reset", cfg.resetMetricsHandler)
 	mux.HandleFunc("POST /api/validate_chirp", validateChirpHandler)
 	mux.HandleFunc("GET /api/healthz", readinessHandler)
+	mux.HandleFunc("POST /api/users", cfg.createUserHandler)
+	mux.HandleFunc("POST /admin/reset", cfg.resetUsersHandler)
+	mux.HandleFunc("POST /api/chirps", cfg.chirpHandler)
+	mux.HandleFunc("GET /api/chirps", cfg.getChirpsHandler)
+	mux.HandleFunc("GET /api/chirps/{chirp_id}", cfg.getChirpByIdHandler)
 	log.Fatal(srv.ListenAndServe())
 }
