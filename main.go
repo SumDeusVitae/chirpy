@@ -18,12 +18,14 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
 	platform       string
+	secret         string
 }
 type User struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
+	Token     string    `json:"token"`
 }
 
 type Chirp struct {
@@ -52,6 +54,7 @@ func main() {
 	godotenv.Load()
 	dbURL := os.Getenv("DB_URL")
 	plt := os.Getenv("PLATFORM")
+	scrt := os.Getenv("SECRET")
 
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -68,6 +71,7 @@ func main() {
 	cfg := &apiConfig{
 		db:       dbQueries,
 		platform: plt,
+		secret:   scrt,
 	}
 	cfg.fileserverHits.Store(0)
 	fileServer := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
@@ -82,5 +86,6 @@ func main() {
 	mux.HandleFunc("POST /api/chirps", cfg.chirpHandler)
 	mux.HandleFunc("GET /api/chirps", cfg.getChirpsHandler)
 	mux.HandleFunc("GET /api/chirps/{chirp_id}", cfg.getChirpByIdHandler)
+	mux.HandleFunc("POST /api/login", cfg.loginUserHandler)
 	log.Fatal(srv.ListenAndServe())
 }

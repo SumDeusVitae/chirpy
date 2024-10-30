@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/SumDeusVitae/chirpy/internal/auth"
 	"github.com/SumDeusVitae/chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -12,18 +13,27 @@ import (
 func (cfg *apiConfig) chirpHandler(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	params := struct {
-		Body string    `json:"body"`
-		ID   uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
 	}{}
 	err := decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters")
 		return
 	}
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, 401, "No token in header")
+		return
+	}
+	user_id, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, 401, "Wrong token provided")
+		return
+	}
 	corrected := profanityCheck(params.Body)
 	chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:   corrected,
-		UserID: params.ID,
+		UserID: user_id,
 	})
 	if err != nil {
 		log.Printf("Database error: %v", err)
