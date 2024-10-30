@@ -21,11 +21,12 @@ type apiConfig struct {
 	secret         string
 }
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
-	Token     string    `json:"token"`
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
 }
 
 type Chirp struct {
@@ -87,5 +88,7 @@ func main() {
 	mux.HandleFunc("GET /api/chirps", cfg.getChirpsHandler)
 	mux.HandleFunc("GET /api/chirps/{chirp_id}", cfg.getChirpByIdHandler)
 	mux.HandleFunc("POST /api/login", cfg.loginUserHandler)
+	mux.HandleFunc("POST /api/refresh", cfg.checkRefreshHandler)
+	mux.HandleFunc("POST /api/revoke", cfg.revokeTokenHandler)
 	log.Fatal(srv.ListenAndServe())
 }
