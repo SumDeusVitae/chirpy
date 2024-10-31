@@ -19,6 +19,7 @@ type apiConfig struct {
 	db             *database.Queries
 	platform       string
 	secret         string
+	polka_api      string
 }
 type User struct {
 	ID           uuid.UUID `json:"id"`
@@ -57,6 +58,7 @@ func main() {
 	dbURL := os.Getenv("DB_URL")
 	plt := os.Getenv("PLATFORM")
 	scrt := os.Getenv("SECRET")
+	polka_key := os.Getenv("POLKA_KEY")
 
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -71,9 +73,10 @@ func main() {
 		Handler: mux,
 	}
 	cfg := &apiConfig{
-		db:       dbQueries,
-		platform: plt,
-		secret:   scrt,
+		db:        dbQueries,
+		platform:  plt,
+		secret:    scrt,
+		polka_api: polka_key,
 	}
 	cfg.fileserverHits.Store(0)
 	fileServer := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
