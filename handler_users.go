@@ -37,10 +37,11 @@ func (cfg *apiConfig) createUserHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	person := User{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
+		ID:          user.ID,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed,
 	}
 	respondWithJSON(w, 201, person)
 
@@ -57,4 +58,50 @@ func (cfg *apiConfig) resetUsersHandler(w http.ResponseWriter, r *http.Request) 
 	cfg.fileserverHits.Store(0)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Everything reset"))
+}
+
+func (cfg *apiConfig) updateUserHandler(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	params := struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}{}
+
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters")
+		return
+	}
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "No token in header")
+		return
+	}
+	user_id, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Wrong token provided")
+		return
+	}
+	hashed_password, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't hash password")
+		return
+	}
+	updated_user, err := cfg.db.UpdateUser(r.Context(), database.UpdateUserParams{
+		HashedPassword: hashed_password,
+		Email:          params.Email,
+		ID:             user_id,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't update user in db")
+		return
+	}
+	person := User{
+		ID:          updated_user.ID,
+		CreatedAt:   updated_user.CreatedAt,
+		UpdatedAt:   updated_user.UpdatedAt,
+		Email:       updated_user.Email,
+		IsChirpyRed: updated_user.IsChirpyRed,
+	}
+	respondWithJSON(w, 200, person)
 }

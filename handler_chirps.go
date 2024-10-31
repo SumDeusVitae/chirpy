@@ -73,7 +73,8 @@ func (cfg *apiConfig) getChirpsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) getChirpByIdHandler(w http.ResponseWriter, r *http.Request) {
-	chirp_id := r.PathValue("chirp_id")
+	chirp_id := r.PathValue("chirpID")
+	log.Printf("Retrieved chirpID for get: %v", chirp_id)
 	parsedUUID, err := uuid.Parse(chirp_id)
 	if err != nil {
 		respondWithError(w, 404, "Error parsing UUID")
@@ -93,4 +94,45 @@ func (cfg *apiConfig) getChirpByIdHandler(w http.ResponseWriter, r *http.Request
 		User_id:   chirp.UserID,
 	}
 	respondWithJSON(w, 200, resp_chirp)
+}
+
+func (cfg *apiConfig) deleteChirpHandler(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "No token in header")
+		return
+	}
+	user_id, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Wrong token provided")
+		return
+	}
+	chirp_id := r.PathValue("chirpID")
+	log.Printf("Retrieved chirpID in DELETE: %v", chirp_id)
+	parsedUUID, err := uuid.Parse(chirp_id)
+	if err != nil {
+		respondWithError(w, 404, "Error parsing UUID")
+		return
+	}
+	_, err = cfg.db.GetChirpById(r.Context(), parsedUUID)
+	if err != nil {
+		log.Printf("Database error: %v", err)
+		respondWithError(w, 404, "Couldn't get chirp by ID from database")
+		return
+	}
+	result, err := cfg.db.DeleteChirp(r.Context(), database.DeleteChirpParams{
+		ID:     parsedUUID,
+		UserID: user_id,
+	})
+	if err != nil {
+		respondWithError(w, 403, "You are not authorized to delete it.")
+		return
+	}
+	if result == [16]byte{} {
+		respondWithError(w, 403, "Didn't find chirp to delete")
+		return
+	}
+	w.WriteHeader(204)
+	return
+
 }

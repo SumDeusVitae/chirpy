@@ -19,3 +19,8 @@ ORDER BY created_at ASC;
 SELECT *
 FROM chirps
 where id = $1;
+
+-- name: DeleteChirp :one
+DELETE FROM chirps
+WHERE id = $1 AND user_id = $2
+RETURNING id;
