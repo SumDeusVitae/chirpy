@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/SumDeusVitae/chirpy/internal/auth"
 	"github.com/SumDeusVitae/chirpy/internal/database"
@@ -52,14 +53,37 @@ func (cfg *apiConfig) chirpHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) getChirpsHandler(w http.ResponseWriter, r *http.Request) {
-	chirps, err := cfg.db.GetChirps(r.Context())
+	order := r.URL.Query().Get("sort")
+	order = strings.ToUpper(order)
+	var dbChirps []database.Chirp
+	var err error
+	if order == "DESC" {
+		dbChirps, err = cfg.db.GetChirpsDESC(r.Context())
+	} else {
+		dbChirps, err = cfg.db.GetChirpsASC(r.Context())
+	}
+
 	if err != nil {
 		log.Printf("Database error: %v", err)
 		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps from database")
 		return
 	}
+
+	authorID := uuid.Nil
+	authorIDString := r.URL.Query().Get("author_id")
+	if authorIDString != "" {
+		authorID, err = uuid.Parse(authorIDString)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invaslid author ID")
+			return
+		}
+	}
+
 	var array_chirps []Chirp
-	for _, chirp := range chirps {
+	for _, chirp := range dbChirps {
+		if authorID != uuid.Nil && chirp.UserID != authorID {
+			continue
+		}
 		curr_chirp := Chirp{
 			ID:        chirp.ID,
 			CreatedAt: chirp.CreatedAt,
@@ -70,6 +94,7 @@ func (cfg *apiConfig) getChirpsHandler(w http.ResponseWriter, r *http.Request) {
 		array_chirps = append(array_chirps, curr_chirp)
 	}
 	respondWithJSON(w, 200, array_chirps)
+
 }
 
 func (cfg *apiConfig) getChirpByIdHandler(w http.ResponseWriter, r *http.Request) {
