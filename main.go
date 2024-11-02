@@ -58,6 +58,7 @@ func main() {
 	dbURL := os.Getenv("DB_URL")
 	plt := os.Getenv("PLATFORM")
 	scrt := os.Getenv("SECRET")
+	PORT := os.Getenv("PORT")
 	polka_key := os.Getenv("POLKA_KEY")
 
 	db, err := sql.Open("postgres", dbURL)
@@ -69,8 +70,10 @@ func main() {
 	mux := http.NewServeMux()
 
 	srv := &http.Server{
-		Addr:    ":8080",
-		Handler: mux,
+		Addr:         ":" + PORT,
+		Handler:      mux,
+		WriteTimeout: 30 * time.Second,
+		ReadTimeout:  30 * time.Second,
 	}
 	cfg := &apiConfig{
 		db:        dbQueries,
@@ -82,6 +85,8 @@ func main() {
 	fileServer := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
 
 	mux.Handle("/app/", addCacheControl(cfg.middlewareMetricsInc(fileServer)))
+
+	mux.HandleFunc("/", handleWelcomePage)
 
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
 	mux.HandleFunc("POST /api/validate_chirp", validateChirpHandler)
