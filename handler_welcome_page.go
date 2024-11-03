@@ -8,7 +8,7 @@ func handleWelcomePage(w http.ResponseWriter, r *http.Request) {
 	const page = `<html>
 	<head></head>
 	<body>
-		<p> WELCOME PAGE from GO server. </p>
+		<p>Hi Docker, I pushed a new version!</p>
 	</body>
 	</html>
 	`
